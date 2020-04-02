@@ -83,12 +83,28 @@ public:
     void activate(Arkanoid& game);
 };
 
+class Fire : public Bonus
+{
+public:
+	Fire(sf::Vector2f position): Bonus (position){filename = "sprites/fire_sprite.png";}
+    void activate(Arkanoid& game);
+};
+
+class Turrerts : public Bonus
+{
+public:
+	Turrets(sf::Vector2f position): Bonus (position){filename = "sprites/fire_sprite.png";}
+    void activate(Arkanoid& game);
+};
+
 
 
 struct Ball
 {
     sf::Vector2f position;
     sf::Vector2f velocity;
+    sf::Color color;
+    bool is_fired;
 };
 
 struct Block
@@ -105,11 +121,14 @@ class Arkanoid
 private:
     // Время, которое прошло с начала игры
     float time;
-    const float bonus_duration = 1;
+    const float fire_duration = 2.5;
+    float fire_time = 0;
     // Границы игрового поля
     float left, right, bottom, top;
     
     // Цвета
+    const sf::Color  ball_default_color = sf::Color(246, 213, 92);
+    const sf::Color  ball_fired_color = sf::Color(255, 0, 0);
     sf::Color  ball_color;
     sf::Color  paddle_color;
     sf::Color  block_color;
@@ -191,7 +210,7 @@ private:
         int max_rand = 10000;
         if ((rand() % max_rand) * 1.0f / max_rand < bonus_probability)
         {
-        	switch(rand() % 5)
+        	switch(rand() % 6)
         	{
         		case 0:
         			bonuses.push_back(new Tripple((*block_iterator).position));
@@ -208,6 +227,10 @@ private:
         		case 4:
         			bonuses.push_back(new Decrease_Paddle((*block_iterator).position));
         			break;
+        		case 5:
+        			bonuses.push_back(new Fire((*block_iterator).position));
+        			break;
+
         	}
             
         }
@@ -235,7 +258,7 @@ private:
         float closest_point_norm = norm(closest_point);
         // Если расстояние == 0, то это значит, что шарик за 1 фрейм зашёл центром внутрь блока
         // Отражаем шарик от блока
-        if (closest_point_norm < 1e-4)
+        if (closest_point_norm < 1e-4 && !ball.is_fired)
         {
             if (fabs(ball.velocity.x) > fabs(ball.velocity.y))
                 ball.velocity.x *= -1;
@@ -249,8 +272,11 @@ private:
         // Отражение от углов и по касательной.
         else if (sqnorm(closest_point) < ball_radius * ball_radius)
         {
-            ball.position -= closest_point * ((ball_radius - closest_point_norm) / closest_point_norm);
-            ball.velocity -= 2.0f * closest_point * (closest_point * ball.velocity) / (closest_point_norm*closest_point_norm);
+        	if(!ball.is_fired)
+        	{
+            	ball.position -= closest_point * ((ball_radius - closest_point_norm) / closest_point_norm);
+            	ball.velocity -= 2.0f * closest_point * (closest_point * ball.velocity) / (closest_point_norm*closest_point_norm);
+            }
             erase_block(closest_iterator);           
         }
     }
@@ -308,11 +334,11 @@ private:
     }
 
 
-    void draw_ball(sf::RenderWindow& window, sf::Vector2f position)
+    void draw_ball(sf::RenderWindow& window, sf::Vector2f position, sf::Color color)
     {
         ball_shape.setRadius(ball_radius);
         ball_shape.setOrigin(ball_radius, ball_radius);
-        ball_shape.setFillColor(ball_color);
+        ball_shape.setFillColor(color);
         ball_shape.setPosition(position);
         window.draw(ball_shape);
     }
@@ -330,7 +356,7 @@ public:
         bottom = 0;
         top = window.getSize().y;
 
-        ball_color = sf::Color(246, 213, 92);
+        ball_color = ball_default_color;
         paddle_color = sf::Color::White;
         block_color = sf::Color(100, 200, 250);
 
@@ -351,7 +377,7 @@ public:
         is_stack = true;
         number_of_lives = 5;
 
-        bonus_probability = 0.5;
+        bonus_probability = 0.1;
     }
 
     void add_block(sf::Vector2f position)
@@ -368,10 +394,21 @@ public:
     void update(const sf::RenderWindow& window, float dt)
     {
         time += dt;
+        fire_time += dt;
         // Положение ракетки
         paddle.position.x = sf::Mouse::getPosition(window).x;
 
         // Обрабатываем шарики
+        if (fire_time > fire_duration)
+        {
+        	for (std::list<Ball>::iterator it = balls.begin(); it != balls.end(); it++)
+        	{
+        		it->color = ball_default_color;
+        		it->is_fired = false;
+        	}
+        	
+        }
+
         for (std::list<Ball>::iterator it = balls.begin(); it != balls.end(); it++)
         {
             (*it).position += (*it).velocity * dt;
@@ -403,11 +440,6 @@ public:
                     it = bonuses.erase(it);
                  }
             }
-            else if ((*it)->time >= bonus_duration)
-            {
-            	delete (*it);
-                it = bonuses.erase(it);
-            }
             
         }
     }
@@ -426,7 +458,7 @@ public:
         // Рисуем шарики
         for (const Ball& ball : balls)
         {
-            draw_ball(window, ball.position);
+            draw_ball(window, ball.position, ball.color);
         }
 
         // Рисуем ракетку
@@ -436,13 +468,13 @@ public:
         // Если мы в режиме начала игры, то рисуем шарик на ракетке
         if (is_stack)
         {
-            draw_ball(window, {paddle.position.x, paddle.position.y - paddle.height/2 - ball_radius});
+            draw_ball(window, {paddle.position.x, paddle.position.y - paddle.height/2 - ball_radius}, ball_default_color);
         }
 
         // Рисуем кол-во жизней вверху слева
         for (int i = 0; i < number_of_lives; i++)
         {
-            draw_ball(window, {ball_radius * (3 * i + 2), 2 * ball_radius});
+            draw_ball(window, {ball_radius * (3 * i + 2), 2 * ball_radius}, ball_default_color);
         }
 
         // Рисуем бонусы
@@ -464,7 +496,7 @@ public:
                 float velocity_norm = ball_speed;
                 sf::Vector2f new_ball_position = {paddle.position.x, paddle.position.y - paddle.height/2 - ball_radius};
                 sf::Vector2f new_ball_velocity = {-velocity_norm * cosf(velocity_angle), -velocity_norm * sinf(velocity_angle)};
-                add_ball({new_ball_position, new_ball_velocity});
+                add_ball({new_ball_position, new_ball_velocity, ball_default_color});
             }
         }
     }
@@ -489,7 +521,7 @@ void Bonus::draw(sf::RenderWindow& window, Arkanoid& game)
 	sf::Texture texture;
     texture.loadFromFile(filename);
     sf::Sprite sprite(texture);
-    sprite.setScale(0.4, 0.3);
+    sprite.setScale(0.3, 0.23);
     //sprite.setOrigin(texture.getSize().x/2, texture.getSize().y);
     sprite.setPosition(position);
     window.draw(sprite);
@@ -537,6 +569,17 @@ void Decrease_Paddle::activate(Arkanoid& game)
     game.paddle.width -= paddle_width_decrease;
     game.paddle_shape.setSize({game.paddle.width, game.paddle.height});
     game.paddle_shape.setOrigin(game.paddle.width / 2, game.paddle.height / 2);
+}
+
+void Fire::activate(Arkanoid& game)
+{
+	game.fire_time = 0;
+	game.ball_color = game.ball_fired_color;
+	for (std::list<Ball>::iterator it = game.balls.begin(); it != game.balls.end(); it++)
+	{
+		it->is_fired = true;
+		it->color = game.ball_fired_color;
+	}
 }
 
 
