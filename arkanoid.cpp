@@ -557,7 +557,7 @@ public:
         is_stack = true;
         number_of_lives = 5;
 
-        bonus_probability = 0.5;
+        bonus_probability = 0.05;
 
         if (!font.loadFromFile("consolas.ttf"))
     	{
