@@ -270,7 +270,7 @@ private:
         return blocks.erase(block_iterator);   
     }
 
-    void is_win(sf::RenderWindow& window)
+    bool is_win(sf::RenderWindow& window)
     {
     	if(killable_blocks <= 0)
     	{
@@ -288,23 +288,24 @@ private:
     		text.setCharacterSize(50);
     		text.setFont(font);
     		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
-    		text.setFillColor(sf::Color::White);
+    		text.setFillColor(sf::Color::Blue);
     		text.setPosition(right / 2, top / 2);
     		window.draw(text);
-
+            return true;
     	}
+        return false;
     }
 
-    void is_lose (sf::RenderWindow& window)
+    bool is_lose (sf::RenderWindow& window)
     {
     	if (number_of_lives == 0){
     		window.clear(sf::Color(12, 31, 47));
     		sf::Text text;
-    		text.setString("You lose");
+    		text.setString("Game over");
     		text.setCharacterSize(100);
     		text.setFont(font);
     		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
-    		text.setFillColor(sf::Color::White);
+    		text.setFillColor(sf::Color::Red);
     		text.setPosition(right / 2, top / 2 - 100);
     		window.draw(text);
 
@@ -312,10 +313,12 @@ private:
     		text.setCharacterSize(50);
     		text.setFont(font);
     		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
-    		text.setFillColor(sf::Color::White);
+    		text.setFillColor(sf::Color::Blue);
     		text.setPosition(right / 2, top / 2);
     		window.draw(text);
+            return true;
     	}
+        return false;
     }
 
 
@@ -521,7 +524,7 @@ public:
         is_stack = true;
         number_of_lives = 5;
 
-        bonus_probability = 0.05;
+        bonus_probability = 0.1;
 
         if (!font.loadFromFile("consolas.ttf"))
     	{
@@ -644,7 +647,7 @@ public:
             switch (block.type)
             {
             	case 0:
-            		type_color = sf::Color::Black;
+            		type_color = sf::Color(70, 70, 70);
             		break;
             	case 1:
             		type_color = sf::Color::Red;
@@ -700,11 +703,11 @@ public:
     }
 
 
-    void on_mouse_pressed(sf::Event& event)
+    void on_mouse_pressed(sf::Event& event, sf::RenderWindow& window)
     {
         if (is_stack)
         {
-            if (event.mouseButton.button == sf::Mouse::Left)
+            if (event.mouseButton.button == sf::Mouse::Left && !(is_win(window) || is_lose(window)))
             {
                 is_stack = false;
                 float velocity_angle = (rand() % 100 + 40) * M_PI / 180;
@@ -876,7 +879,7 @@ int main ()
             }
             if (event.type == sf::Event::MouseButtonPressed)
             {
-                game.on_mouse_pressed(event);
+                game.on_mouse_pressed(event, window);
             }
             if (event.type == sf::Event::KeyPressed)
             {
