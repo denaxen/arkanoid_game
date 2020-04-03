@@ -9,8 +9,9 @@
 
 #define M_PI 3.1415926536
 const float ball_velocity_change = 0.2;
-const float paddle_width_decrease = 70;
-const float paddle_width_increase = 50;
+const float paddle_width_decrease = 40;
+const float paddle_width_increase = 20;
+const float bullets_speed = 500;
 
 
 float operator*(const sf::Vector2f& first, const sf::Vector2f& second)
@@ -29,6 +30,7 @@ class Bonus
 protected:
     static const float speed;
     sf::Vector2f position;
+    sf::Vector2f scale;
     float time;
     std::string filename;
 
@@ -90,11 +92,32 @@ public:
     void activate(Arkanoid& game);
 };
 
-class Turrerts : public Bonus
+class Turrets : public Bonus
 {
 public:
-	Turrets(sf::Vector2f position): Bonus (position){filename = "sprites/fire_sprite.png";}
+	Turrets(sf::Vector2f position): Bonus (position){filename = "sprites/turrets_sprite.png";}
     void activate(Arkanoid& game);
+};
+
+class Bullet
+{
+private:
+	sf::Vector2f position;
+public:
+	Bullet(sf::Vector2f position): position(position) {}
+	void draw(sf::RenderWindow& window, Arkanoid& game);
+	void update(const sf::RenderWindow& window, Arkanoid& game, float dt);
+
+	friend class Arkanoid;
+};
+
+class Turret
+{
+private:
+	sf::Vector2f position1, position2;
+public:
+	void draw(sf::RenderWindow& window, Arkanoid& game);
+	void fire(float dt, Arkanoid& game);
 };
 
 
@@ -111,6 +134,10 @@ struct Block
 {
     float width, height;
     sf::Vector2f position;
+    int counter;
+    int number_of_lives;
+    int type;
+    
 };
 
 
@@ -121,8 +148,13 @@ class Arkanoid
 private:
     // Время, которое прошло с начала игры
     float time;
+
+    int killable_blocks = 0;
+    
     const float fire_duration = 2.5;
+    const float turrets_duration = 10;
     float fire_time = 0;
+    float turrets_time = 0;
     // Границы игрового поля
     float left, right, bottom, top;
     
@@ -138,11 +170,13 @@ private:
     sf::RectangleShape paddle_shape;
     sf::RectangleShape block_shape;
 
+    Turret turrets;
 
     float ball_radius;
     float ball_speed;
     // Связыный список всех шариков
     std::list<Ball> balls;
+    std::list<Bullet> bullets;
 
     float block_width, block_height;
     // Связыный список всех блоков
@@ -153,6 +187,7 @@ private:
     // Переменная, которая показывает находится ли шарик на ракетке
     // В начале игры, или после того, как все шары упали
     bool is_stack;
+    bool is_turrets_activated = false;
 
     // Число жизней
     int number_of_lives;
@@ -165,7 +200,7 @@ private:
     // Вероятность того, что при разрушении блока выпадет бонус
     float bonus_probability;
 
-
+    sf::Font font;
 
     float norm(sf::Vector2f a)
     {
@@ -205,12 +240,13 @@ private:
     }
 
     // Удаляем блок по итературу и создаём бонус с некоторой вероятностью
-    void erase_block(std::list<Block>::iterator block_iterator)
+    std::list<Block>::iterator erase_block(std::list<Block>::iterator block_iterator)
     {
+    	killable_blocks--;
         int max_rand = 10000;
         if ((rand() % max_rand) * 1.0f / max_rand < bonus_probability)
         {
-        	switch(rand() % 6)
+        	switch(rand() % 7)
         	{
         		case 0:
         			bonuses.push_back(new Tripple((*block_iterator).position));
@@ -230,11 +266,134 @@ private:
         		case 5:
         			bonuses.push_back(new Fire((*block_iterator).position));
         			break;
+        		case 6:
+        			bonuses.push_back(new Turrets((*block_iterator).position));
+        			break;
 
         	}
             
         }
-        blocks.erase(block_iterator);   
+        
+        return blocks.erase(block_iterator);   
+    }
+
+    void is_win(sf::RenderWindow& window)
+    {
+    	if(killable_blocks <= 0)
+    	{
+    		window.clear(sf::Color(12, 31, 47));
+    		sf::Text text;
+    		text.setString("You won");
+    		text.setCharacterSize(100);
+    		text.setFont(font);
+    		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
+    		text.setFillColor(sf::Color::White);
+    		text.setPosition(right / 2, top / 2 - 100);
+    		window.draw(text);
+
+    		text.setString("Press esc to exit");
+    		text.setCharacterSize(50);
+    		text.setFont(font);
+    		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
+    		text.setFillColor(sf::Color::White);
+    		text.setPosition(right / 2, top / 2);
+    		window.draw(text);
+
+    	}
+    }
+
+    void is_lose (sf::RenderWindow& window)
+    {
+    	if (number_of_lives == 0){
+    		window.clear(sf::Color(12, 31, 47));
+    		sf::Text text;
+    		text.setString("You lose");
+    		text.setCharacterSize(100);
+    		text.setFont(font);
+    		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
+    		text.setFillColor(sf::Color::White);
+    		text.setPosition(right / 2, top / 2 - 100);
+    		window.draw(text);
+
+    		text.setString("Press esc to exit");
+    		text.setCharacterSize(50);
+    		text.setFont(font);
+    		text.setOrigin(text.getLocalBounds().width / 2, text.getCharacterSize() / 2);
+    		text.setFillColor(sf::Color::White);
+    		text.setPosition(right / 2, top / 2);
+    		window.draw(text);
+    	}
+    }
+
+
+
+    void dynamite (std::list<Block>::iterator& it)
+    {
+    	//std::cout << it->counter;
+    	const std::list<Block>::iterator tmp = it;
+    	int tmp_num = it->counter;
+    	if (tmp_num % 20)   //если блок не в первой линии
+    	{
+    		it--;
+    		if (it->counter == tmp_num - 1)
+    		{
+    			it = erase_block(it);
+    			//std::cout << "up" << std::endl;
+    		}
+    	}
+    	it++;
+    	if ((it->counter == tmp_num + 1) && ((tmp_num + 1) % 20))   //если блок не в нижней линии
+    	{
+    		it = erase_block(++it);
+    		//std::cout << " down" << std::endl;
+    	}
+    	
+    	
+        if (!((it)->counter < 420 && (it)->counter >= 400)) //если блок не в правом столбце
+        {
+        	//std::cout << "right" << std::endl;
+	    	while (it->counter < tmp_num + 20)
+	    	{
+	    		it++;
+	    		if (it == blocks.end())
+	    			break;
+	    	}
+	    	if (it->counter == tmp_num + 20)
+	    		it = erase_block(it);
+    	}
+    	it = tmp;
+
+        if ((it)->counter > 19)								//если блок не в левом столбце
+        {
+        	//std::cout << "left" << std::endl;
+        	while (it->counter > tmp_num - 20)
+        	{
+        		if (it != blocks.begin())
+        			it--;
+        		else
+        			break;
+        	}
+        	if (it->counter == tmp_num - 20)
+        		it = erase_block(it);
+        }
+        erase_block(tmp);
+    	
+    }
+    void types (std::list<Block>::iterator& it)
+    {	
+    	//std::cout << it->counter << std::endl;
+    	if (it->type == 2)
+        {
+            it->number_of_lives--;
+            if (it->number_of_lives == 0)
+            	erase_block(it);
+        }
+        if (it->type == 3)
+            erase_block(it);
+    	if (it->type == 1)
+    		dynamite(it);
+    	
+        
     }
 
     // Обрабатываем столкновения шарика со всеми блоками
@@ -265,7 +424,7 @@ private:
             else
                 ball.velocity.y *= -1;
 
-            erase_block(closest_iterator);  
+            types(closest_iterator);
 
         }
         // Если расстояние != 0, но шарик касается блока, то мы можем просчитать отражение более точно
@@ -277,9 +436,12 @@ private:
             	ball.position -= closest_point * ((ball_radius - closest_point_norm) / closest_point_norm);
             	ball.velocity -= 2.0f * closest_point * (closest_point * ball.velocity) / (closest_point_norm*closest_point_norm);
             }
-            erase_block(closest_iterator);           
+            types(closest_iterator);
+                   
         }
     }
+
+
 
     // Обрабатываем столкновения шарика с ракеткой
     void handle_paddle_collision(Ball& ball)
@@ -324,6 +486,24 @@ private:
             ball.velocity.y *= -1;
         }*/
 
+    }
+
+    void handle_bullets_collision(std::list<Bullet>& bullets)
+    {
+    	for (std::list<Block>::iterator it = blocks.begin(); it != blocks.end(); it++)
+    		for (std::list<Bullet>::iterator bullet = bullets.begin(); bullet != bullets.end(); bullet++)
+    		{
+    			if ((bullet->position.x <= it->position.x + block_width / 2 + 2) && (bullet->position.x >= it->position.x - block_width / 2) &&
+    				(bullet->position.y <= it->position.y + block_height / 2) && (bullet->position.y >= it->position.y - block_height / 2))
+    				{
+    					bullet = bullets.erase(bullet);
+    					if (it->type != 0)
+    						it = erase_block(it);
+    				}
+
+				if (bullet->position.y < bottom)
+					bullet = bullets.erase(bullet);
+    		}
     }
 
     void handle_all_collisions(Ball& current_ball)
@@ -377,12 +557,36 @@ public:
         is_stack = true;
         number_of_lives = 5;
 
-        bonus_probability = 0.1;
+        bonus_probability = 0.5;
+
+        if (!font.loadFromFile("consolas.ttf"))
+    	{
+        	std::cout << "Can't load button font" << std::endl;
+    	}
     }
 
-    void add_block(sf::Vector2f position)
+    void add_block(sf::Vector2f position, int number)
     {
-        blocks.push_back({block_width, block_height, position});
+    	const float three_block = 0.1, unkillable = 0.02, dynamite = 0.05;
+    	int max_rand = 10000, type;
+    	float type_probability = (rand() % max_rand) * 1.0f / max_rand;
+    	if (type_probability <= unkillable)
+        	blocks.push_back({block_width, block_height, position, number, 1, 0});
+        else if (type_probability <= dynamite && type_probability > unkillable)
+        {
+        	blocks.push_back({block_width, block_height, position, number, 1, 1});
+        	killable_blocks++;
+        }
+        else if (type_probability <= three_block && type_probability > dynamite)
+        {
+        	killable_blocks++;
+        	blocks.push_back({block_width, block_height, position, number, 3, 2});
+        }
+        else
+        {
+        	killable_blocks++;
+        	blocks.push_back({block_width, block_height, position, number, 1, 3});
+        }
     }
 
     void add_ball(Ball ball)
@@ -395,6 +599,7 @@ public:
     {
         time += dt;
         fire_time += dt;
+        turrets_time += dt;
         // Положение ракетки
         paddle.position.x = sf::Mouse::getPosition(window).x;
 
@@ -406,8 +611,17 @@ public:
         		it->color = ball_default_color;
         		it->is_fired = false;
         	}
-        	
         }
+        if (is_turrets_activated)
+        {
+        	turrets.fire(dt, *this);
+        	for(Bullet& bullet : bullets)
+        		bullet.update(window, *this, dt);
+        	handle_bullets_collision(bullets);
+        }
+
+        
+        
 
         for (std::list<Ball>::iterator it = balls.begin(); it != balls.end(); it++)
         {
@@ -430,18 +644,35 @@ public:
         for (std::list<Bonus*>::iterator it = bonuses.begin(); it != bonuses.end(); it++)
         {
             (*it)->update(dt);
-            if ((*it)->position.y > paddle.position.y - paddle.height/2 && (*it)->position.y < paddle.position.y + paddle.height/2)
+            if(paddle.position.y - paddle.height / 2 <= (*it)->position.y + (*it)->scale.y && paddle.position.y + paddle.height / 2 >= (*it)->position.y)
             {
-                 if (((*it)->position.x > paddle.position.x - paddle.width/2 && (*it)->position.x < paddle.position.x + paddle.width/2))
+                 if(((*it)->position.x + (*it)->scale.x >= paddle.position.x - paddle.width/2 && (*it)->position.x <= paddle.position.x + paddle.width/2))
                  {
                     (*it)->activate(*this);
                     (*it)->time = 0;
                     delete (*it);
                     it = bonuses.erase(it);
                  }
+                 continue;
             }
-            
+            else if ((*it)->position.y > top)
+            {
+            	delete (*it);
+                it = bonuses.erase(it);
+            }
         }
+
+
+
+        if (turrets_time > turrets_duration)
+        {
+        	is_turrets_activated = false;
+        	for (std::list<Bullet>::iterator it = bullets.begin(); it != bullets.end(); it++)
+        		it = bullets.erase(it);
+        }
+        //std::cout << balls.size() << " " << bullets.size() << " " << bonuses.size() << std::endl;
+
+        
     }
 
     void draw(sf::RenderWindow& window)
@@ -449,16 +680,43 @@ public:
         // Рисуем блоки
         for (const Block& block : blocks)
         {
+        	sf::Color type_color;
             block_shape.setOrigin(block.width / 2, block.height / 2);
             block_shape.setPosition(block.position);
-            block_shape.setFillColor(block_color);
+            switch (block.type)
+            {
+            	case 0:
+            		type_color = sf::Color::Black;
+            		break;
+            	case 1:
+            		type_color = sf::Color::Red;
+            		break;
+            	case 2:
+            		type_color = sf::Color::Yellow;
+            		break;
+            	case 3:
+            		type_color = block_color;
+            		break;
+            }
+
+            block_shape.setFillColor(type_color);
             window.draw(block_shape);
         }
+
+        
+
+        if(is_turrets_activated)
+        	turrets.draw(window, *this);
 
         // Рисуем шарики
         for (const Ball& ball : balls)
         {
             draw_ball(window, ball.position, ball.color);
+        }
+
+        for(Bullet& bullet : bullets)
+        {
+        	bullet.draw(window, *this);
         }
 
         // Рисуем ракетку
@@ -482,6 +740,10 @@ public:
         {
             pbonus->draw(window, *this);
         }
+
+
+        is_lose(window);
+        is_win(window);
     }
 
 
@@ -513,6 +775,8 @@ public:
     friend class Fire;
     friend class Floor;
     friend class Turrets;
+    friend class Turret;
+    friend class Bullet;
 };
 
 
@@ -524,6 +788,7 @@ void Bonus::draw(sf::RenderWindow& window, Arkanoid& game)
     sprite.setScale(0.3, 0.23);
     //sprite.setOrigin(texture.getSize().x/2, texture.getSize().y);
     sprite.setPosition(position);
+    scale = {sprite.getScale().x * sprite.getLocalBounds().width, sprite.getScale().y * sprite.getLocalBounds().height};
     window.draw(sprite);
 }
 
@@ -535,11 +800,11 @@ void Tripple::activate(Arkanoid& game)
     {
         float velocity_x = rand() % ((int)(2*game.ball_speed)) - game.ball_speed;
         float velocity_y = sqrtf(fabs(game.ball_speed*game.ball_speed - velocity_x*velocity_x));
-        game.add_ball({(*ball_it).position, {velocity_x, -velocity_y}});
+        game.add_ball({(*ball_it).position, {velocity_x, -velocity_y}, game.ball_default_color});
 
         velocity_x = rand() % ((int)(2*game.ball_speed)) - game.ball_speed;
         velocity_y = sqrtf(fabs(game.ball_speed*game.ball_speed - velocity_x*velocity_x));
-        game.add_ball({(*ball_it).position, {velocity_x, -velocity_y}});
+        game.add_ball({(*ball_it).position, {velocity_x, -velocity_y}, game.ball_default_color});
         ball_it++;
     }
 }
@@ -566,8 +831,11 @@ void Increase_Paddle::activate(Arkanoid& game)
 
 void Decrease_Paddle::activate(Arkanoid& game)
 {
-    game.paddle.width -= paddle_width_decrease;
-    game.paddle_shape.setSize({game.paddle.width, game.paddle.height});
+	if (game.paddle.width - paddle_width_decrease >= 60)
+    	game.paddle.width -= paddle_width_decrease;
+	else
+		game.paddle.width = 60;
+	game.paddle_shape.setSize({game.paddle.width, game.paddle.height});
     game.paddle_shape.setOrigin(game.paddle.width / 2, game.paddle.height / 2);
 }
 
@@ -580,6 +848,49 @@ void Fire::activate(Arkanoid& game)
 		it->is_fired = true;
 		it->color = game.ball_fired_color;
 	}
+}
+
+void Turrets::activate(Arkanoid& game)
+{
+	game.is_turrets_activated = true;
+	game.turrets_time = 0;
+}
+
+void Turret::draw(sf::RenderWindow& window, Arkanoid& game)
+{
+	sf::CircleShape turret(10, 3);
+	position1 = {game.paddle.position.x - game.paddle.width / 2 + turret.getRadius(), game.paddle.position.y - game.paddle.height / 2 - turret.getRadius() / 2};
+	position2 = {game.paddle.position.x + game.paddle.width / 2 - turret.getRadius(), game.paddle.position.y - game.paddle.height / 2 - turret.getRadius() / 2};
+	turret.setFillColor(sf::Color::White);
+	turret.setOrigin (turret.getRadius(), turret.getRadius());
+	turret.setPosition(position1);
+	window.draw(turret);
+	turret.setPosition(position2);
+	window.draw(turret);
+}
+
+void Turret::fire(float dt, Arkanoid& game)
+{
+	if (!((int)(60 * game.time) % 30))
+	{
+		Bullet bullet1(this->position1), bullet2(this->position2);
+		game.bullets.push_back(bullet1);
+		game.bullets.push_back(bullet2);
+	}
+}
+
+void Bullet::draw(sf::RenderWindow& window, Arkanoid& game)
+{
+	sf::CircleShape circle(10);
+	circle.setFillColor(sf::Color::Blue);
+	circle.setPosition(this->position);
+	circle.setOrigin(circle.getRadius(), circle.getRadius());
+	window.draw(circle);
+}
+
+void Bullet::update(const sf::RenderWindow& window, Arkanoid& game, float dt)
+{
+	this->position.y -= bullets_speed * dt;
 }
 
 
@@ -601,7 +912,7 @@ int main ()
         {
             int stride_x = 40;
             int stride_y = 16;
-            game.add_block({(float)((i + 1) * (stride_x + 3) + 22), {(float)((j + 2) * (stride_y +3))}});
+            game.add_block({(float)((i + 1) * (stride_x + 3) + 22), ((float)((j + 2) * (stride_y +3)))}, i*20 + j);
         }
         
 
