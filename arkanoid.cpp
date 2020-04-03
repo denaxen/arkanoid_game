@@ -24,7 +24,6 @@ struct Block;
 class Arkanoid;
 
 
-
 class Bonus
 {
 protected:
@@ -49,6 +48,8 @@ public:
     virtual void activate(Arkanoid& game){}
     friend class Arkanoid;
 };
+
+
 
 class Tripple : public Bonus
 {
@@ -99,6 +100,8 @@ public:
     void activate(Arkanoid& game);
 };
 
+
+
 class Bullet
 {
 private:
@@ -146,7 +149,6 @@ struct Block
 class Arkanoid
 {
 private:
-    // Время, которое прошло с начала игры
     float time;
 
     int killable_blocks = 0;
@@ -155,17 +157,16 @@ private:
     const float turrets_duration = 10;
     float fire_time = 0;
     float turrets_time = 0;
-    // Границы игрового поля
+    // boundaries of the playing field
     float left, right, bottom, top;
     
-    // Цвета
+
     const sf::Color  ball_default_color = sf::Color(246, 213, 92);
     const sf::Color  ball_fired_color = sf::Color(255, 0, 0);
     sf::Color  ball_color;
     sf::Color  paddle_color;
     sf::Color  block_color;
 
-    // Фигуры для рисования, для рисования всех блоков - 1 фигура
     sf::CircleShape ball_shape;
     sf::RectangleShape paddle_shape;
     sf::RectangleShape block_shape;
@@ -174,30 +175,24 @@ private:
 
     float ball_radius;
     float ball_speed;
-    // Связыный список всех шариков
+
     std::list<Ball> balls;
     std::list<Bullet> bullets;
 
     float block_width, block_height;
-    // Связыный список всех блоков
+
     std::list<Block> blocks;
 
-    // Ракетка
+
     Block paddle;
-    // Переменная, которая показывает находится ли шарик на ракетке
-    // В начале игры, или после того, как все шары упали
+
     bool is_stack;
     bool is_turrets_activated = false;
 
-    // Число жизней
     int number_of_lives;
 
-    // Связыный список указателей на бонусы
-    // Почему указатели - для реализации полиформизма
-    // Так как в будущем мы хотим сделать несколько вариантов бонусов
     std::list<Bonus*> bonuses;
 
-    // Вероятность того, что при разрушении блока выпадет бонус
     float bonus_probability;
 
     sf::Font font;
@@ -212,7 +207,6 @@ private:
         return a.x * a.x + a.y * a.y;
     }
 
-    // Функция, которая ищет вектор от центра шарика до ближайшей точки блока
     sf::Vector2f find_closest_point(const Ball& ball, const Block& block)
     {
         float rect_left   = block.position.x - block.width/2;
@@ -239,7 +233,6 @@ private:
         return d;
     }
 
-    // Удаляем блок по итературу и создаём бонус с некоторой вероятностью
     std::list<Block>::iterator erase_block(std::list<Block>::iterator block_iterator)
     {
     	killable_blocks--;
@@ -329,29 +322,25 @@ private:
 
     void dynamite (std::list<Block>::iterator& it)
     {
-    	//std::cout << it->counter;
     	const std::list<Block>::iterator tmp = it;
     	int tmp_num = it->counter;
-    	if (tmp_num % 20)   //если блок не в первой линии
+    	if (tmp_num % 20)   //if the block isn't on the first line
     	{
     		it--;
     		if (it->counter == tmp_num - 1)
     		{
     			it = erase_block(it);
-    			//std::cout << "up" << std::endl;
     		}
     	}
     	it++;
-    	if ((it->counter == tmp_num + 1) && ((tmp_num + 1) % 20))   //если блок не в нижней линии
+    	if ((it->counter == tmp_num + 1) && ((tmp_num + 1) % 20))   //if the block isn't on the last line
     	{
     		it = erase_block(++it);
-    		//std::cout << " down" << std::endl;
     	}
     	
     	
-        if (!((it)->counter < 420 && (it)->counter >= 400)) //если блок не в правом столбце
+        if (!((it)->counter < 420 && (it)->counter >= 400)) //if the block isn't in left line
         {
-        	//std::cout << "right" << std::endl;
 	    	while (it->counter < tmp_num + 20)
 	    	{
 	    		it++;
@@ -363,9 +352,8 @@ private:
     	}
     	it = tmp;
 
-        if ((it)->counter > 19)								//если блок не в левом столбце
+        if ((it)->counter > 19)								//if the block isn't in left line
         {
-        	//std::cout << "left" << std::endl;
         	while (it->counter > tmp_num - 20)
         	{
         		if (it != blocks.begin())
@@ -381,7 +369,6 @@ private:
     }
     void types (std::list<Block>::iterator& it)
     {	
-    	//std::cout << it->counter << std::endl;
     	if (it->type == 2)
         {
             it->number_of_lives--;
@@ -392,16 +379,10 @@ private:
             erase_block(it);
     	if (it->type == 1)
     		dynamite(it);
-    	
-        
     }
 
-    // Обрабатываем столкновения шарика со всеми блоками
     void handle_blocks_collision(Ball& ball)
     {
-        // Ищем ближайшую точку до блоков
-        // Перебираем все блоки - это не самая эффективная реализация,
-        // Можно написать намного быстрее, но не так просто
         sf::Vector2f closest_point = {10000, 10000};
         std::list<Block>::iterator closest_iterator;
         for (std::list<Block>::iterator it = blocks.begin(); it != blocks.end(); it++)
@@ -415,8 +396,7 @@ private:
         }
 
         float closest_point_norm = norm(closest_point);
-        // Если расстояние == 0, то это значит, что шарик за 1 фрейм зашёл центром внутрь блока
-        // Отражаем шарик от блока
+
         if (closest_point_norm < 1e-4 && !ball.is_fired)
         {
             if (fabs(ball.velocity.x) > fabs(ball.velocity.y))
@@ -427,8 +407,7 @@ private:
             types(closest_iterator);
 
         }
-        // Если расстояние != 0, но шарик касается блока, то мы можем просчитать отражение более точно
-        // Отражение от углов и по касательной.
+
         else if (sqnorm(closest_point) < ball_radius * ball_radius)
         {
         	if(!ball.is_fired)
@@ -441,9 +420,6 @@ private:
         }
     }
 
-
-
-    // Обрабатываем столкновения шарика с ракеткой
     void handle_paddle_collision(Ball& ball)
     {
         if (ball.position.y + ball_radius > paddle.position.y - paddle.height/2 &&
@@ -452,7 +428,6 @@ private:
             if (ball.position.x + ball_radius > paddle.position.x - paddle.width/2 &&
                 ball.position.x - ball_radius < paddle.position.x + paddle.width/2)
             {
-                // Угол отражения зависит от места на ракетке, куда стукнулся шарик
                 float velocity_angle = (ball.position.x - paddle.position.x) / (paddle.width + 2 * ball_radius) * (0.8*M_PI) + M_PI/2;
                 float velocity_norm = norm(ball.velocity);
                 ball.velocity.x = -velocity_norm * cosf(velocity_angle);
@@ -461,7 +436,6 @@ private:
         }
     }
 
-    // Обрабатываем столкновения шарика со стенами
     void handle_wall_collision(Ball& ball)
     {
         if (ball.position.x < left + ball_radius)
@@ -479,13 +453,6 @@ private:
             ball.position.y = bottom + ball_radius;
             ball.velocity.y *= -1;
         }
-
-        /*if (ball.position.y > top - ball_radius)
-        {
-        	ball.position.y = top - ball_radius;
-            ball.velocity.y *= -1;
-        }*/
-
     }
 
     void handle_bullets_collision(std::list<Bullet>& bullets)
@@ -524,8 +491,6 @@ private:
     }
 
 
-
-
 public:
     Arkanoid(const sf::RenderWindow& window)
     {
@@ -551,7 +516,6 @@ public:
         paddle_shape.setOrigin(paddle.width / 2, paddle.height / 2);
 
         ball_speed = 600;
-        //balls.push_back({{500, 500}, {ball_speed, 400}});
         ball_radius = 8;
 
         is_stack = true;
@@ -594,16 +558,14 @@ public:
         balls.push_back(ball);
     }
 
-    // Эта функция вызывается каждый кадр
     void update(const sf::RenderWindow& window, float dt)
     {
         time += dt;
         fire_time += dt;
         turrets_time += dt;
-        // Положение ракетки
+
         paddle.position.x = sf::Mouse::getPosition(window).x;
 
-        // Обрабатываем шарики
         if (fire_time > fire_duration)
         {
         	for (std::list<Ball>::iterator it = balls.begin(); it != balls.end(); it++)
@@ -633,14 +595,12 @@ public:
             }
         }
 
-        // Если шариков нет, то переходи в режим начала игры и уменьшаем кол-во жизней
         if (!is_stack && balls.size() == 0)
         {
             is_stack = true;
             number_of_lives--;
         }
         
-        // Обрабатываем бонусы
         for (std::list<Bonus*>::iterator it = bonuses.begin(); it != bonuses.end(); it++)
         {
             (*it)->update(dt);
@@ -669,15 +629,13 @@ public:
         	is_turrets_activated = false;
         	for (std::list<Bullet>::iterator it = bullets.begin(); it != bullets.end(); it++)
         		it = bullets.erase(it);
-        }
-        //std::cout << balls.size() << " " << bullets.size() << " " << bonuses.size() << std::endl;
+		}
 
         
     }
 
     void draw(sf::RenderWindow& window)
     {
-        // Рисуем блоки
         for (const Block& block : blocks)
         {
         	sf::Color type_color;
@@ -708,7 +666,6 @@ public:
         if(is_turrets_activated)
         	turrets.draw(window, *this);
 
-        // Рисуем шарики
         for (const Ball& ball : balls)
         {
             draw_ball(window, ball.position, ball.color);
@@ -719,23 +676,19 @@ public:
         	bullet.draw(window, *this);
         }
 
-        // Рисуем ракетку
         paddle_shape.setPosition(paddle.position);
         window.draw(paddle_shape);
 
-        // Если мы в режиме начала игры, то рисуем шарик на ракетке
         if (is_stack)
         {
             draw_ball(window, {paddle.position.x, paddle.position.y - paddle.height/2 - ball_radius}, ball_default_color);
         }
 
-        // Рисуем кол-во жизней вверху слева
         for (int i = 0; i < number_of_lives; i++)
         {
             draw_ball(window, {ball_radius * (3 * i + 2), 2 * ball_radius}, ball_default_color);
         }
 
-        // Рисуем бонусы
         for (Bonus* pbonus : bonuses)
         {
             pbonus->draw(window, *this);
@@ -763,9 +716,6 @@ public:
         }
     }
 
-
-
-    // Класс бонус должен быть дружественным, так как он может менять внутреннее состояние игры
     friend class Bonus;
     friend class Tripple;
     friend class Increase_Speed;
@@ -786,7 +736,6 @@ void Bonus::draw(sf::RenderWindow& window, Arkanoid& game)
     texture.loadFromFile(filename);
     sf::Sprite sprite(texture);
     sprite.setScale(0.3, 0.23);
-    //sprite.setOrigin(texture.getSize().x/2, texture.getSize().y);
     sprite.setPosition(position);
     scale = {sprite.getScale().x * sprite.getLocalBounds().width, sprite.getScale().y * sprite.getLocalBounds().height};
     window.draw(sprite);
@@ -856,6 +805,8 @@ void Turrets::activate(Arkanoid& game)
 	game.turrets_time = 0;
 }
 
+
+
 void Turret::draw(sf::RenderWindow& window, Arkanoid& game)
 {
 	sf::CircleShape turret(10, 3);
@@ -893,8 +844,6 @@ void Bullet::update(const sf::RenderWindow& window, Arkanoid& game, float dt)
 	this->position.y -= bullets_speed * dt;
 }
 
-
-// Скорость бонусов
 const float Bonus::speed = 100;
 
 
@@ -918,7 +867,6 @@ int main ()
 
     while (window.isOpen()) 
     {
-        // Обработка событий
         sf::Event event;
         while(window.pollEvent(event)) 
         {
@@ -937,11 +885,9 @@ int main ()
 
         }
         window.clear(sf::Color(12, 31, 47));
-        // Расчитываем новые координаты и новую скорость шарика
         game.update(window, 1.0f/60);
         game.draw(window);
 
-        // Отображам всё нарисованное на временном "холсте" на экран
         window.display();
     }
 
